@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Mirror: Deepfake vs Reality Analyzer</title>
+  <style>
+    /* Basic CSS reset & styling */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f4f7fa;
+      color: #333;
+      display: flex;
+      justify-content: center;
+    }
+
+    #app {
+      max-width: 600px;
+      width: 100%;
+      background: white;
+      padding: 30px 40px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      border-radius: 8px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+      margin-bottom: 30px;
+    }
+
+    input[type="file"] {
+      display: block;
+      margin-bottom: 20px;
+      width: 100%;
+    }
+
+    button {
+      display: inline-block;
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background-color 0.3s ease;
+    }
+
+    button:disabled {
+      background-color: #a9cbe9;
+      cursor: not-allowed;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: #2980b9;
+    }
+
+    #result {
+      margin-top: 25px;
+      background: #eaf2f8;
+      padding: 20px;
+      border-radius: 5px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    #result h2 {
+      margin-top: 0;
+      color: #34495e;
+    }
+
+    ul.emotion-list {
+      padding-left: 20px;
+      max-height: 250px;
+      overflow-y: auto;
+    }
+
+    ul.emotion-list li {
+      margin-bottom: 6px;
+      font-size: 14px;
+      color: #2c3e50;
+    }
+
+    .error {
+      color: #e74c3c;
+      margin-top: 20px;
+      font-weight: 600;
+    }
+
+    .loading-text {
+      font-weight: 600;
+      text-align: center;
+      margin-top: 20px;
+      color: #2980b9;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>AI Mirror: Deepfake vs Reality Analyzer</h1>
+    <input type="file" id="fileInput" accept="video/*,image/*" />
+    <button id="analyzeBtn" disabled>Analyze</button>
+    <div id="loading" class="loading-text" style="display:none;">Analyzing, please wait...</div>
+    <div id="error" class="error" style="display:none;"></div>
+    <div id="result"></div>
+  </div>
+
+  <script>
+    (function() {
+      const fileInput = document.getElementById('fileInput');
+      const analyzeBtn = document.getElementById('analyzeBtn');
+      const resultDiv = document.getElementById('result');
+      const loadingDiv = document.getElementById('loading');
+      const errorDiv = document.getElementById('error');
+
+      let selectedFile = null;
+
+      fileInput.addEventListener('change', (e) => {
+        errorDiv.style.display = "none";
+        resultDiv.innerHTML = "";
+        selectedFile = e.target.files[0];
+        analyzeBtn.disabled = !selectedFile;
+      });
+
+      analyzeBtn.addEventListener('click', async () => {
+        if (!selectedFile) return;
+
+        errorDiv.style.display = "none";
+        resultDiv.innerHTML = "";
+        loadingDiv.style.display = "block";
+        analyzeBtn.disabled = true;
+        fileInput.disabled = true;
+
+        try {
+          const formData = new FormData();
+          formData.append('media', selectedFile);
+
+          // IMPORTANT: Replace this URL with your actual backend endpoint URL!
+          const response = await fetch('https://YOUR_BACKEND_URL/api/analyze', {
+            method: 'POST',
+            body: formData
+          });
+
+          if (!response.ok) {
+            throw new Error(`Server error: ${response.status} ${response.statusText}`);
+          }
+
+          const data = await response.json();
+
+          renderResult(data);
+        } catch (err) {
+          errorDiv.textContent = "Error: " + err.message;
+          errorDiv.style.display = "block";
+        } finally {
+          loadingDiv.style.display = "none";
+          analyzeBtn.disabled = false;
+          fileInput.disabled = false;
+        }
+      });
+
+      function renderResult(data) {
+        if (data.error) {
+          errorDiv.textContent = data.error;
+          errorDiv.style.display = "block";
+          return;
+        }
+
+        const deepfakePercent = (data.deepfake_score * 100).toFixed(2);
+        const emotionConsistent = data.emotion_consistency ? "Consistent" : "Inconsistent";
+
+        let html = `
+          <h2>Results</h2>
+          <p><strong>Deepfake Probability:</strong> ${deepfakePercent}%</p>
+          <p><strong>Emotional Consistency:</strong> ${emotionConsistent}</p>
+        `;
+
+        if (Array.isArray(data.emotions) && data.emotions.length > 0) {
+          html += `<h3>Emotion Timeline:</h3><ul class="emotion-list">`;
+
+          data.emotions.forEach(frameData => {
+            const frameNum = frameData.frame;
+            const emotion = frameData.dominant_emotion || "unknown";
+            const confidence = (frameData.confidence * 100).toFixed(1);
+            html += `<li>Frame ${frameNum}: ${emotion} (Confidence: ${confidence}%)</li>`;
+          });
+
+          html += "</ul>";
+        }
+
+        resultDiv.innerHTML = html;
+      }
+    })();
+  </script>
+</body>
+</html>
